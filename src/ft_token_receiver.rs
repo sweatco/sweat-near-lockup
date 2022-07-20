@@ -16,8 +16,8 @@ impl FungibleTokenReceiver for Contract {
         self.assert_deposit_whitelist(sender_id.as_ref());
         let batched_users: BatchedUsers =
             serde_json::from_str(&msg).expect("Expected BatchedUsers as msg");
-        let tge_timestamp = 1654549079;
-        let tge_plus_6_month = 1670349479;
+        let tge_timestamp = 1658275200; // 2022-07-20T00:00:00 UTC
+        let tge_plus_6_month = 1660953600; // 2022-08-20T00:00:00 UTC
         let mut sum: u128 = 0;
         for (account_id, sweat) in batched_users.batch {
             sum = sum + sweat.0;
