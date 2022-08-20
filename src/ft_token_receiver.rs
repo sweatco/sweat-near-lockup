@@ -13,30 +13,38 @@ impl FungibleTokenReceiver for Contract {
             self.token_account_id,
             "Invalid token ID"
         );
+
         self.assert_deposit_whitelist(sender_id.as_ref());
         let batched_users: BatchedUsers =
             serde_json::from_str(&msg).expect("Expected BatchedUsers as msg");
-        let tge_timestamp = 1658275200; // 2022-07-20T00:00:00 UTC
-        let tge_plus_6_month = 1660953600; // 2022-08-20T00:00:00 UTC
+
+        let tge_timestamp = 1663070400; // 2022-09-13T12:00:00 UTC
+        let full_unlock_timestamp = 1726228800; // 2024-09-13T12:00:00 UTC
         let mut sum: u128 = 0;
         for (account_id, sweat) in batched_users.batch {
-            sum = sum + sweat.0;
+            let account_total = sweat.0;
+            sum = sum + account_total;
+
             let user_lockup = Lockup {
                 account_id: account_id,
                 schedule: Schedule(vec![
                     Checkpoint {
-                        timestamp: tge_timestamp,
-                        balance: 0,
+                        timestamp: tge_timestamp - 1,
+                        balance: 0
                     },
                     Checkpoint {
-                        timestamp: tge_plus_6_month,
-                        balance: sweat.0,
+                        timestamp: tge_timestamp,
+                        balance: 10 * account_total / 100,
+                    },
+                    Checkpoint {
+                        timestamp: full_unlock_timestamp,
+                        balance: account_total,
                     },
                 ]),
                 claimed_balance: 0,
                 termination_config: None,
             };
-            user_lockup.assert_new_valid(sweat.0);
+            user_lockup.assert_new_valid(account_total);
             let _index = self.internal_add_lockup(&user_lockup);
         }
         assert_eq!(amount.0, sum);
