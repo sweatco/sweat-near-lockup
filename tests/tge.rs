@@ -26,7 +26,7 @@ fn test_tge_user() {
     let c_at_tge = U128(d(2, TOKEN_DECIMALS));
 
 
-    // BEGORE TGE
+    // BEFORE TGE
     env.set_time_sec(TGE_TIMESTAMP - 1);
 
     let lockups = env.get_account_lockups(&users.alice);

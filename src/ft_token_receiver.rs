@@ -1,5 +1,8 @@
 use crate::*;
 
+const TGE_TIMESTAMP: u32 = 1663070400; // 2022-09-13T12:00:00 UTC
+const FULL_UNLOCK_TIMESTAMP: u32 = 1726228800; // 2024-09-13T12:00:00 UTC
+
 #[near_bindgen]
 impl FungibleTokenReceiver for Contract {
     fn ft_on_transfer(
@@ -18,8 +21,6 @@ impl FungibleTokenReceiver for Contract {
         let batched_users: BatchedUsers =
             serde_json::from_str(&msg).expect("Expected BatchedUsers as msg");
 
-        let tge_timestamp = 1663070400; // 2022-09-13T12:00:00 UTC
-        let full_unlock_timestamp = 1726228800; // 2024-09-13T12:00:00 UTC
         let mut sum: u128 = 0;
         for (account_id, sweat) in batched_users.batch {
             let account_total = sweat.0;
@@ -29,15 +30,15 @@ impl FungibleTokenReceiver for Contract {
                 account_id: account_id,
                 schedule: Schedule(vec![
                     Checkpoint {
-                        timestamp: tge_timestamp - 1,
+                        timestamp: TGE_TIMESTAMP - 1,
                         balance: 0
                     },
                     Checkpoint {
-                        timestamp: tge_timestamp,
+                        timestamp: TGE_TIMESTAMP,
                         balance: 10 * account_total / 100,
                     },
                     Checkpoint {
-                        timestamp: full_unlock_timestamp,
+                        timestamp: FULL_UNLOCK_TIMESTAMP,
                         balance: account_total,
                     },
                 ]),
