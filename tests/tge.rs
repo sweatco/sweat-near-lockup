@@ -6,9 +6,7 @@ use ft_lockup::lockup::{BatchedUsers};
 use near_sdk::json_types::WrappedBalance;
 use near_sdk::json_types::U128;
 
-// const ONE_DAY_SEC: TimestampSec = 24 * 60 * 60;
-// const ONE_MONTH_SEC: TimestampSec = 30 * 24 * 60 * 60;
-const ONE_YEAR_SEC: TimestampSec = 365 * ONE_DAY_SEC;
+const ONE_YEAR_SEC: TimestampSec = 365 * 30 * 24 * 60 * 60;
 
 const TGE_TIMESTAMP: TimestampSec = 1663070400; // 2022-09-13T12:00:00 UTC
 const FULL_UNLOCK_TIMESTAMP: TimestampSec = 1726228800; // 2024-09-13T12:00:00 UTC
