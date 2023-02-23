@@ -1,8 +1,5 @@
 use crate::*;
 
-const TGE_TIMESTAMP: u32 = 1663059600; // 2022-09-13T09:00:00 UTC
-const FULL_UNLOCK_TIMESTAMP: u32 = 1726218000; // 2024-09-13T09:00:00 UTC
-
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct DraftGroupFunding {
@@ -40,28 +37,22 @@ impl FungibleTokenReceiver for Contract {
         match ft_message {
             FtMessage::BatchedUsers(batched_users) => {
                 let mut sum: u128 = 0;
+                let termination_config = batched_users
+                    .beneficiary_id
+                    .map(|value| TerminationConfig {
+                        beneficiary_id: value,
+                        vesting_schedule: VestingConditions::SameAsLockupSchedule,
+                    });
+
                 for (account_id, sweat) in batched_users.batch {
                     let account_total = sweat.0;
                     sum = sum + account_total;
 
                     let user_lockup = Lockup {
-                        account_id: account_id,
-                        schedule: Schedule(vec![
-                            Checkpoint {
-                                timestamp: TGE_TIMESTAMP - 1,
-                                balance: 0,
-                            },
-                            Checkpoint {
-                                timestamp: TGE_TIMESTAMP,
-                                balance: 10 * account_total / 100,
-                            },
-                            Checkpoint {
-                                timestamp: FULL_UNLOCK_TIMESTAMP,
-                                balance: account_total,
-                            },
-                        ]),
+                        account_id,
+                        schedule: Schedule::new_on_tge(account_total),
                         claimed_balance: 0,
-                        termination_config: None,
+                        termination_config: termination_config.clone(),
                     };
                     user_lockup.assert_new_valid(account_total);
                     let _index = self.internal_add_lockup(&user_lockup);

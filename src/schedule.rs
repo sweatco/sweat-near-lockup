@@ -1,5 +1,8 @@
 use crate::*;
 
+const TGE_TIMESTAMP: u32 = 1663059600; //! 2022-09-13T09:00:00 UTC
+const FULL_UNLOCK_TIMESTAMP: u32 = 1726218000; //! 2024-09-13T09:00:00 UTC
+
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
@@ -16,6 +19,23 @@ pub struct Checkpoint {
 pub struct Schedule(pub Vec<Checkpoint>);
 
 impl Schedule {
+    pub fn new_on_tge(total: u128) -> Self {
+        Self(vec![
+            Checkpoint {
+                timestamp: TGE_TIMESTAMP - 1,
+                balance: 0,
+            },
+            Checkpoint {
+                timestamp: TGE_TIMESTAMP,
+                balance: 10 * total / 100,
+            },
+            Checkpoint {
+                timestamp: FULL_UNLOCK_TIMESTAMP,
+                balance: total,
+            },
+        ])
+    }
+
     pub fn new_zero_balance_from_to(
         start_timestamp: TimestampSec,
         finish_timestamp: TimestampSec,
@@ -122,8 +142,8 @@ impl Schedule {
         let passed_duration = current_timestamp - checkpoint.timestamp;
         checkpoint.balance
             + (U256::from(passed_duration)
-                * U256::from(next_checkpoint.balance - checkpoint.balance)
-                / U256::from(total_duration))
+            * U256::from(next_checkpoint.balance - checkpoint.balance)
+            / U256::from(total_duration))
             .as_u128()
     }
 
@@ -160,8 +180,8 @@ impl Schedule {
                 // Computing the new timestamp rounding up
                 let new_timestamp = prev_checkpoint.timestamp
                     + ((U256::from(timestamp_diff) * U256::from(required_balance_diff)
-                        + U256::from(balance_diff - 1))
-                        / U256::from(balance_diff))
+                    + U256::from(balance_diff - 1))
+                    / U256::from(balance_diff))
                     .as_u32();
                 self.0.push(Checkpoint {
                     timestamp: new_timestamp,
