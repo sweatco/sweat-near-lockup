@@ -10,47 +10,23 @@ pub struct Checkpoint {
     pub balance: Balance,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Clone))]
 pub struct Schedule(pub Vec<Checkpoint>);
 
 impl Schedule {
-    pub fn new_zero_balance_from_to(
-        start_timestamp: TimestampSec,
-        finish_timestamp: TimestampSec,
-    ) -> Self {
-        assert!(finish_timestamp > start_timestamp, "Invariant");
-
+    pub fn new_unlocked(total_balance: Balance) -> Self {
         Self(vec![
             Checkpoint {
-                timestamp: start_timestamp,
+                timestamp: 0,
                 balance: 0,
             },
             Checkpoint {
-                timestamp: finish_timestamp,
-                balance: 0,
-            },
-        ])
-    }
-
-    pub fn new_unlocked_since(total_balance: Balance, timestamp: TimestampSec) -> Self {
-        assert!(timestamp > 0, "Invariant");
-        Self(vec![
-            Checkpoint {
-                timestamp: timestamp - 1,
-                balance: 0,
-            },
-            Checkpoint {
-                timestamp: timestamp,
+                timestamp: 1,
                 balance: total_balance,
             },
         ])
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn new_unlocked(total_balance: Balance) -> Self {
-        Self::new_unlocked_since(total_balance, 1)
     }
 
     pub fn assert_valid(&self, total_balance: Balance) {
@@ -64,10 +40,6 @@ impl Schedule {
             assert!(self.0[i - 1].timestamp < self.0[i].timestamp, "The timestamp of checkpoint #{} should be less than the timestamp of the next checkpoint", i - 1);
             assert!(self.0[i - 1].balance <= self.0[i].balance, "The balance of checkpoint #{} should be not greater than the balance of the next checkpoint", i - 1);
         }
-        assert!(
-            self.total_balance() > 0,
-            "expected total balance to be positive",
-        );
         assert_eq!(
             self.total_balance(),
             total_balance,
@@ -133,18 +105,9 @@ impl Schedule {
 
     /// Terminates the lockup schedule earlier.
     /// Assumes new_total_balance is not greater than the current total balance.
-    pub fn terminate(&mut self, new_total_balance: Balance, finish_timestamp: TimestampSec) {
+    pub fn terminate(&mut self, new_total_balance: Balance) {
         if new_total_balance == 0 {
-            // finish_timestamp is a hint, only used for fully unvested schedules
-            // can be overwritten to preserve schedule invariants
-            // used to preserve part of the schedule before the termination happens
-            let start_timestamp = self.0[0].timestamp;
-            let finish_timestamp = if finish_timestamp > start_timestamp {
-                finish_timestamp
-            } else {
-                start_timestamp + 1
-            };
-            self.0 = Self::new_zero_balance_from_to(start_timestamp, finish_timestamp).0;
+            self.0 = Self::new_unlocked(0).0;
             return;
         }
         assert!(
