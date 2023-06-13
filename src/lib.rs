@@ -5,6 +5,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{Base58CryptoHash, ValidAccountId, WrappedBalance, U128};
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::serde_json::json;
 use near_sdk::{
     assert_one_yocto, env, ext_contract, is_promise_success, log, near_bindgen, serde_json,
     AccountId, Balance, BorshStorageKey, CryptoHash, Gas, PanicOnDefault, PromiseOrValue,
@@ -91,6 +92,47 @@ impl Contract {
 
     pub fn claim(&mut self) -> PromiseOrValue<WrappedBalance> {
         panic!("Service is unavailable");
+    }
+
+    #[private]
+    pub fn seize(&mut self, account_ids: Vec<AccountId>) -> WrappedBalance {
+        let mut seized_balance: u128 = 0;
+
+        for account_id in account_ids {
+            if let Some(indices) = self.account_lockups.get(&account_id.clone()) {
+                let mut account_balance: u128 = 0;
+
+                for index in indices {
+                    let lockup = self.lockups.get(index as u64).unwrap();
+
+                    if lockup.claimed_balance > 0 {
+                        continue;
+                    }
+
+                    account_balance += lockup.schedule.total_balance();
+
+                    let zero_lockup = Lockup::new_unlocked(account_id.clone(), 0);
+                    self.lockups.replace(index as _, &zero_lockup);
+                }
+
+                log(json!({
+                    "event_type": "seize_for_account",
+                    "account_id": account_id.clone(),
+                    "amount": U128(account_balance),
+                }));
+
+                seized_balance += account_balance;
+            }
+        }
+
+        let result = U128(seized_balance);
+
+        log(json!({
+            "event_type": "seize_for_batch",
+            "amount": result,
+        }));
+
+        result
     }
 
     pub fn terminate(
