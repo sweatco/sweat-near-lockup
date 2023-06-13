@@ -90,54 +90,7 @@ impl Contract {
     }
 
     pub fn claim(&mut self) -> PromiseOrValue<WrappedBalance> {
-        let account_id = env::predecessor_account_id();
-        let lockups = self.internal_get_account_lockups(&account_id);
-
-        if lockups.is_empty() {
-            return PromiseOrValue::Value(0.into());
-        }
-
-        let mut lockup_claims = vec![];
-        let mut total_unclaimed_balance = 0;
-        for (lockup_index, mut lockup) in lockups {
-            let lockup_claim = lockup.claim(lockup_index);
-            if lockup_claim.unclaimed_balance.0 > 0 {
-                log!(
-                    "Claiming {} form lockup #{}",
-                    lockup_claim.unclaimed_balance.0,
-                    lockup_index
-                );
-                total_unclaimed_balance += lockup_claim.unclaimed_balance.0;
-                self.lockups.replace(lockup_index as _, &lockup);
-                lockup_claims.push(lockup_claim);
-            }
-        }
-        log!("Total claim {}", total_unclaimed_balance);
-
-        if total_unclaimed_balance > 0 {
-            ext_fungible_token::ft_transfer(
-                account_id.clone(),
-                total_unclaimed_balance.into(),
-                Some(format!(
-                    "Claiming unlocked {} balance from {}",
-                    total_unclaimed_balance,
-                    env::current_account_id()
-                )),
-                &self.token_account_id,
-                ONE_YOCTO,
-                GAS_FOR_FT_TRANSFER,
-            )
-            .then(ext_self::after_ft_transfer(
-                account_id,
-                lockup_claims,
-                &env::current_account_id(),
-                NO_DEPOSIT,
-                GAS_FOR_AFTER_FT_TRANSFER,
-            ))
-            .into()
-        } else {
-            PromiseOrValue::Value(0.into())
-        }
+        panic!("Service is unavailable");
     }
 
     pub fn terminate(
