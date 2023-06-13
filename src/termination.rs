@@ -1,10 +1,9 @@
 use crate::*;
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
-pub enum VestingConditions {
-    SameAsLockupSchedule,
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Clone))]
+pub enum HashOrSchedule {
     Hash(Base58CryptoHash),
     Schedule(Schedule),
 }
@@ -13,27 +12,32 @@ pub enum VestingConditions {
 #[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Clone))]
 pub struct TerminationConfig {
-    /// The account ID who paid for the lockup creation
-    /// and will receive unvested balance upon termination
-    pub beneficiary_id: ValidAccountId,
+    /// The account ID that can terminate vesting.
+    pub terminator_id: ValidAccountId,
     /// An optional vesting schedule
-    pub vesting_schedule: VestingConditions,
+    pub vesting_schedule: Option<HashOrSchedule>,
 }
 
 impl Lockup {
     pub fn terminate(
         &mut self,
+        initiator_id: &AccountId,
         hashed_schedule: Option<Schedule>,
-        termination_timestamp: TimestampSec,
-    ) -> (Balance, AccountId) {
+    ) -> Balance {
         let termination_config = self
             .termination_config
             .take()
             .expect("No termination config");
+        assert_eq!(
+            termination_config.terminator_id.as_ref(),
+            initiator_id,
+            "Unauthorized"
+        );
         let total_balance = self.schedule.total_balance();
+        let current_timestamp = current_timestamp_sec();
         let vested_balance = match &termination_config.vesting_schedule {
-            VestingConditions::SameAsLockupSchedule => &self.schedule,
-            VestingConditions::Hash(hash) => {
+            None => &self.schedule,
+            Some(HashOrSchedule::Hash(hash)) => {
                 let schedule = hashed_schedule
                     .as_ref()
                     .expect("Revealed schedule required for the termination");
@@ -47,14 +51,13 @@ impl Lockup {
                 self.schedule.assert_valid_termination_schedule(schedule);
                 schedule
             }
-            VestingConditions::Schedule(schedule) => &schedule,
+            Some(HashOrSchedule::Schedule(schedule)) => &schedule,
         }
-        .unlocked_balance(termination_timestamp);
+        .unlocked_balance(current_timestamp);
         let unvested_balance = total_balance - vested_balance;
         if unvested_balance > 0 {
-            self.schedule
-                .terminate(vested_balance, termination_timestamp);
+            self.schedule.terminate(vested_balance);
         }
-        (unvested_balance, termination_config.beneficiary_id.into())
+        unvested_balance
     }
 }
