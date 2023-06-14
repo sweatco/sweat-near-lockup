@@ -34,7 +34,7 @@ async function connect() {
 }
 
 async function seize(account, ids) {
-  return await account.functionCall({
+  const contractResponse = await account.functionCall({
     contractId: CONTRACT_ADDRESS,
     methodName: "seize",
     args: {
@@ -42,21 +42,33 @@ async function seize(account, ids) {
     },
     gas: new BN("300000000000000")
   });
+
+  const result = await account.connection.provider.txStatus(
+    contractResponse.transaction.hash,
+    account.accountId
+  );
+
+  return result;
 }
 
 async function seizeSafely(account, ids) {
   try {
-    const contractResponse = await seize(account, ids);
+    const txResult = await seize(account, ids);
 
-    fs.appendFileSync(
-      TRANSACTIONS_LOG_FILENAME,
-      `${contractResponse.transaction.hash}\n`
-    );
+    if (txResult.status.SuccessValue) {
+      console.log("Transaction was successful");
+
+      return txResult;
+    } else {
+      console.log("Transaction failed, retry...");
+
+      return await seizeSafely(account, ids);
+    }
   } catch (e) {
     console.log("Error occurred:", e);
     console.log("Retry...");
 
-    await seizeSafely(account, ids);
+    return await seizeSafely(account, ids);
   }
 }
 
@@ -92,12 +104,19 @@ async function run() {
 
   while (hasMoreData()) {
     let ids = await readFirstNLines(ACCOUND_IDS_FILE_NAME, BATCH_SIZE);
-    
+
     console.log(`Running seize for batch ${ids[0]}..${ids[ids.length - 1]}`);
-    
-    await seizeSafely(account, ids);
+
+    let result = await seizeSafely(account, ids);
+    let txHash = result.transaction.hash;
+
+    console.log(`## Transaction hash: ${txHash}`);
+
+    fs.appendFileSync(TRANSACTIONS_LOG_FILENAME, `${txHash}\n`);
     await exec(`sed -i.bu '1,${BATCH_SIZE}d' ${ACCOUND_IDS_FILE_NAME}`);
   }
+
+  console.log("All done! 🎉");
 }
 
 run();
