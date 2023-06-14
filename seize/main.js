@@ -4,10 +4,12 @@ const fs = require("fs");
 const { exec } = require("child_process");
 const readline = require("node:readline");
 
-const CONTRACT_ADDRESS = "v2.lockup.sweat.testnet";
+const args = process.argv.slice(2);
+const CONTRACT_ADDRESS = args[0];
+const ACCOUND_IDS_FILE_NAME = args[1];
+
 const CREDENTIALS_DIR = ".near-credentials";
-const TRANSACTIONS_LOG_FILENAME = "transactions.log";
-const ACCOUND_IDS_FILE_NAME = "file.txt";
+const TRANSACTIONS_LOG_FILENAME = "transactions.csv";
 const BATCH_SIZE = 3000;
 
 const myKeyStore = new nearApi.keyStores.UnencryptedFileSystemKeyStore(
@@ -72,6 +74,16 @@ async function seizeSafely(account, ids) {
   }
 }
 
+function extractEvents(result) {
+  const events = [];
+
+  for (const receipt of result.receipts_outcome) {
+    events.push(...receipt.outcome.logs);
+  }
+
+  return events;
+}
+
 function hasMoreData() {
   return fs.statSync(ACCOUND_IDS_FILE_NAME).size > 0;
 }
@@ -105,14 +117,18 @@ async function run() {
   while (hasMoreData()) {
     let ids = await readFirstNLines(ACCOUND_IDS_FILE_NAME, BATCH_SIZE);
 
-    console.log(`Running seize for batch ${ids[0]}..${ids[ids.length - 1]}`);
+    console.log(`🚀 Running seize for batch ${ids[0]}..${ids[ids.length - 1]}`);
 
     let result = await seizeSafely(account, ids);
     let txHash = result.transaction.hash;
 
-    console.log(`## Transaction hash: ${txHash}`);
+    let events = extractEvents(result);
+    let seizedBalance = JSON.parse(events[0]).amount;
 
-    fs.appendFileSync(TRANSACTIONS_LOG_FILENAME, `${txHash}\n`);
+    let txOutcome = `${txHash}, ${seizedBalance}`;
+    console.log(`## Transaction hash: ${txOutcome}`);
+    fs.appendFileSync(TRANSACTIONS_LOG_FILENAME, `${txOutcome}\n`);
+
     await exec(`sed -i.bu '1,${BATCH_SIZE}d' ${ACCOUND_IDS_FILE_NAME}`);
   }
 
