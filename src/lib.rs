@@ -5,11 +5,13 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{Base58CryptoHash, ValidAccountId, WrappedBalance, U128};
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::serde_json::json;
 use near_sdk::{
     assert_one_yocto, env, ext_contract, is_promise_success, log, near_bindgen, serde_json,
     AccountId, Balance, BorshStorageKey, CryptoHash, Gas, PanicOnDefault, PromiseOrValue,
     Timestamp,
 };
+use num_bigint::BigUint;
 
 pub mod callbacks;
 pub mod ft_token_receiver;
@@ -90,54 +92,38 @@ impl Contract {
     }
 
     pub fn claim(&mut self) -> PromiseOrValue<WrappedBalance> {
-        let account_id = env::predecessor_account_id();
-        let lockups = self.internal_get_account_lockups(&account_id);
+        panic!("Service is unavailable");
+    }
 
-        if lockups.is_empty() {
-            return PromiseOrValue::Value(0.into());
-        }
+    #[private]
+    pub fn seize(&mut self, account_ids: Vec<AccountId>) -> String {
+        let mut seized_balance: BigUint = BigUint::default();
 
-        let mut lockup_claims = vec![];
-        let mut total_unclaimed_balance = 0;
-        for (lockup_index, mut lockup) in lockups {
-            let lockup_claim = lockup.claim(lockup_index);
-            if lockup_claim.unclaimed_balance.0 > 0 {
-                log!(
-                    "Claiming {} form lockup #{}",
-                    lockup_claim.unclaimed_balance.0,
-                    lockup_index
-                );
-                total_unclaimed_balance += lockup_claim.unclaimed_balance.0;
-                self.lockups.replace(lockup_index as _, &lockup);
-                lockup_claims.push(lockup_claim);
+        for account_id in account_ids {
+            if let Some(indices) = self.account_lockups.get(&account_id.clone()) {
+                for index in indices {
+                    let lockup = self.lockups.get(index as u64).unwrap();
+
+                    if lockup.claimed_balance > 0 {
+                        continue;
+                    }
+
+                    seized_balance += lockup.schedule.total_balance();
+
+                    let zero_lockup = Lockup::new_unlocked(account_id.clone(), 0);
+                    self.lockups.replace(index as _, &zero_lockup);
+                }
             }
         }
-        log!("Total claim {}", total_unclaimed_balance);
 
-        if total_unclaimed_balance > 0 {
-            ext_fungible_token::ft_transfer(
-                account_id.clone(),
-                total_unclaimed_balance.into(),
-                Some(format!(
-                    "Claiming unlocked {} balance from {}",
-                    total_unclaimed_balance,
-                    env::current_account_id()
-                )),
-                &self.token_account_id,
-                ONE_YOCTO,
-                GAS_FOR_FT_TRANSFER,
-            )
-            .then(ext_self::after_ft_transfer(
-                account_id,
-                lockup_claims,
-                &env::current_account_id(),
-                NO_DEPOSIT,
-                GAS_FOR_AFTER_FT_TRANSFER,
-            ))
-            .into()
-        } else {
-            PromiseOrValue::Value(0.into())
-        }
+        let result = seized_balance.to_string();
+
+        log(json!({
+            "event_type": "seize_for_batch",
+            "amount": result,
+        }));
+
+        result
     }
 
     pub fn terminate(

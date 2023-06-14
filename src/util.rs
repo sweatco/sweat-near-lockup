@@ -28,3 +28,7 @@ pub mod u128_dec_format {
             .map_err(de::Error::custom)
     }
 }
+
+pub(crate) fn log(event: serde_json::Value) {
+    env::log(event.to_string().as_bytes());
+}
