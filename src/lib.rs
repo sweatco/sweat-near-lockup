@@ -11,6 +11,7 @@ use near_sdk::{
     AccountId, Balance, BorshStorageKey, CryptoHash, Gas, PanicOnDefault, PromiseOrValue,
     Timestamp,
 };
+use num_bigint::BigUint;
 
 pub mod callbacks;
 pub mod ft_token_receiver;
@@ -95,13 +96,11 @@ impl Contract {
     }
 
     #[private]
-    pub fn seize(&mut self, account_ids: Vec<AccountId>) -> WrappedBalance {
-        let mut seized_balance: u128 = 0;
+    pub fn seize(&mut self, account_ids: Vec<AccountId>) -> String {
+        let mut seized_balance: BigUint = BigUint::default();
 
         for account_id in account_ids {
             if let Some(indices) = self.account_lockups.get(&account_id.clone()) {
-                let mut account_balance: u128 = 0;
-
                 for index in indices {
                     let lockup = self.lockups.get(index as u64).unwrap();
 
@@ -109,17 +108,15 @@ impl Contract {
                         continue;
                     }
 
-                    account_balance += lockup.schedule.total_balance();
+                    seized_balance += lockup.schedule.total_balance();
 
                     let zero_lockup = Lockup::new_unlocked(account_id.clone(), 0);
                     self.lockups.replace(index as _, &zero_lockup);
                 }
-
-                seized_balance += account_balance;
             }
         }
 
-        let result = U128(seized_balance);
+        let result = seized_balance.to_string();
 
         log(json!({
             "event_type": "seize_for_batch",
