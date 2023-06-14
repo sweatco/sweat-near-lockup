@@ -115,12 +115,6 @@ impl Contract {
                     self.lockups.replace(index as _, &zero_lockup);
                 }
 
-                log(json!({
-                    "event_type": "seize_for_account",
-                    "account_id": account_id.clone(),
-                    "amount": U128(account_balance),
-                }));
-
                 seized_balance += account_balance;
             }
         }
