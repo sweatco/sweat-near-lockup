@@ -2,14 +2,14 @@ mod setup;
 
 use crate::setup::*;
 
-use ft_lockup::lockup::{BatchedUsers};
+use ft_lockup::ft_token_receiver::FtMessage;
 use near_sdk::json_types::WrappedBalance;
 use near_sdk::json_types::U128;
 
 const ONE_YEAR_SEC: TimestampSec = 365 * 30 * 24 * 60 * 60;
 
-const TGE_TIMESTAMP: TimestampSec = 1663059600; // 2022-09-13T09:00:00 UTC
-const FULL_UNLOCK_TIMESTAMP: TimestampSec = 1726218000; // 2024-09-13T09:00:00 UTC
+const START_UNLOCK_TIMESTAMP: TimestampSec = 1694509200; // 2022-09-13T09:00:00 UTC
+const FULL_UNLOCK_TIMESTAMP: TimestampSec = 1757667600; // 2024-09-13T09:00:00 UTC
 
 #[test]
 fn test_tge_user() {
@@ -17,27 +17,31 @@ fn test_tge_user() {
     let users = Users::init(&env);
 
     let a = U128(d(60000, TOKEN_DECIMALS));
-    let a_at_tge = U128(d(6000, TOKEN_DECIMALS));
+    let a_at_tge = U128(d(0, TOKEN_DECIMALS));
     let b = U128(d(3000, TOKEN_DECIMALS));
-    let b_at_tge = U128(d(300, TOKEN_DECIMALS));
+    let b_at_tge = U128(d(0, TOKEN_DECIMALS));
     let c = U128(d(20, TOKEN_DECIMALS));
-    let c_at_tge = U128(d(2, TOKEN_DECIMALS));
+    let c_at_tge = U128(d(0, TOKEN_DECIMALS));
 
 
     // BEFORE TGE
-    env.set_time_sec(TGE_TIMESTAMP - 1);
+    env.set_time_sec(START_UNLOCK_TIMESTAMP - 1);
 
     let lockups = env.get_account_lockups(&users.alice);
     assert!(lockups.is_empty());
 
-    let arr = vec![
-        (users.alice.valid_account_id(), a),
-        (users.bob.valid_account_id(), b),
-        (users.charlie.valid_account_id(), c)
-    ];
-    let batch = BatchedUsers { batch: arr };
     let balance: WrappedBalance = env
-        .add_batched_lockup(&env.owner, a.0 + b.0 + c.0, &batch)
+        .create_initial_lockups(
+            &env.owner,
+            a.0 + b.0 + c.0,
+            &FtMessage::CreateInitialLockups(
+                vec![
+                    (users.alice.valid_account_id(), a),
+                    (users.bob.valid_account_id(), b),
+                    (users.charlie.valid_account_id(), c)
+                ]
+            )
+        )
         .unwrap_json();
     assert_eq!(balance.0, a.0 + b.0 + c.0);
 
@@ -54,7 +58,7 @@ fn test_tge_user() {
     assert_eq!(lockups[0].1.total_balance, c.0);
 
     // TGE
-    env.set_time_sec(TGE_TIMESTAMP);
+    env.set_time_sec(START_UNLOCK_TIMESTAMP);
     ft_storage_deposit(&users.alice, TOKEN_ID, &users.alice.account_id);
     ft_storage_deposit(&users.bob, TOKEN_ID, &users.bob.account_id);
     ft_storage_deposit(&users.charlie, TOKEN_ID, &users.charlie.account_id);
@@ -62,7 +66,6 @@ fn test_tge_user() {
     // alice claims at tge
     let lockups = env.get_account_lockups(&users.alice);
     assert_eq!(lockups.len(), 1);
-    println!("{:?}", lockups[0].1);
     assert_eq!(lockups[0].1.unclaimed_balance, a_at_tge.0);
     assert_eq!(lockups[0].1.total_balance, a.0);
     let res: WrappedBalance = env.claim(&users.alice).unwrap_json();

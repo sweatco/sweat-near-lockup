@@ -9,7 +9,8 @@ use near_sdk_sim::{
     deploy, init_simulator, to_yocto, ContractAccount, ExecutionResult, UserAccount, ViewResult,
 };
 
-pub use ft_lockup::lockup::{Lockup, LockupIndex, BatchedUsers};
+pub use ft_lockup::lockup::{Lockup, LockupIndex};
+pub use ft_lockup::ft_token_receiver::FtMessage;
 pub use ft_lockup::schedule::{Checkpoint, Schedule};
 pub use ft_lockup::termination::{HashOrSchedule, TerminationConfig};
 use ft_lockup::view::LockupView;
@@ -241,16 +242,16 @@ impl Env {
         amount: Balance,
         lockup: &Lockup,
     ) -> ExecutionResult {
-        self.ft_transfer_call(user, amount, &serde_json::to_string(lockup).unwrap())
+        self.ft_transfer_call(user, amount, &serde_json::to_string(&FtMessage::CreateLockup(lockup.clone())).unwrap())
     }
 
-    pub fn add_batched_lockup(
+    pub fn create_initial_lockups(
         &self,
         user: &UserAccount,
         amount: Balance,
-        batch: &BatchedUsers,
+        message: &FtMessage,
     ) -> ExecutionResult {
-        self.ft_transfer_call(user, amount, &serde_json::to_string(batch).unwrap())
+        self.ft_transfer_call(user, amount, &serde_json::to_string(message).unwrap())
     }
 
     pub fn claim(&self, user: &UserAccount) -> ExecutionResult {
