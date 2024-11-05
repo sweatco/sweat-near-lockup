@@ -1,4 +1,3 @@
-use crate::ft_token_receiver::{FULL_UNLOCK_TIMESTAMP, TGE_TIMESTAMP};
 use crate::lockup::Lockup;
 use crate::schedule::{Checkpoint, Schedule};
 use crate::*;
@@ -10,6 +9,7 @@ use std::convert::TryFrom;
 #[near_bindgen]
 impl Contract {
     // Optimal batch size is 900
+    #[private]
     pub fn clean(&mut self, batch_size: u64) -> u64 {
         let batch_size = cmp::min(batch_size, self.lockups.len());
         for _ in 0..batch_size {
