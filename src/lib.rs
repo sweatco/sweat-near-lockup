@@ -24,6 +24,7 @@ pub mod termination;
 pub mod util;
 pub mod view;
 mod cleanup;
+mod migration;
 
 use crate::draft::*;
 use crate::event::*;
@@ -237,14 +238,14 @@ impl Contract {
                 ONE_YOCTO,
                 GAS_FOR_FT_TRANSFER,
             )
-            .then(ext_self::after_ft_transfer(
-                account_id,
-                lockup_claims,
-                &env::current_account_id(),
-                NO_DEPOSIT,
-                GAS_FOR_AFTER_FT_TRANSFER,
-            ))
-            .into()
+                .then(ext_self::after_ft_transfer(
+                    account_id,
+                    lockup_claims,
+                    &env::current_account_id(),
+                    NO_DEPOSIT,
+                    GAS_FOR_AFTER_FT_TRANSFER,
+                ))
+                .into()
         } else {
             PromiseOrValue::Value(0.into())
         }
@@ -300,14 +301,14 @@ impl Contract {
                 ONE_YOCTO,
                 GAS_FOR_FT_TRANSFER,
             )
-            .then(ext_self::after_lockup_termination(
-                beneficiary_id,
-                unvested_balance.into(),
-                &env::current_account_id(),
-                NO_DEPOSIT,
-                GAS_FOR_AFTER_FT_TRANSFER,
-            ))
-            .into()
+                .then(ext_self::after_lockup_termination(
+                    beneficiary_id,
+                    unvested_balance.into(),
+                    &env::current_account_id(),
+                    NO_DEPOSIT,
+                    GAS_FOR_AFTER_FT_TRANSFER,
+                ))
+                .into()
         } else {
             PromiseOrValue::Value(0.into())
         }
